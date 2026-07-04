@@ -1,7 +1,5 @@
 /* =========================================================
-   PORTFOLIO SCRIPT — Cosmic 3D build
-   Sections: Galaxy (Three.js) · Smooth Scroll (Lenis) ·
-   Scroll Storytelling (GSAP) · Interactions · Utilities
+   PORTFOLIO SCRIPT — Cosmic 3D build (Aurora Holographic)
    ========================================================= */
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -29,8 +27,7 @@ function initGalaxy() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
   renderer.setSize(window.innerWidth, window.innerHeight);
 
-  // --- Star field (vertex points, layered for depth) ---
-  const starColors = [0x00F0FF, 0xC440F5, 0x45A29E, 0xC5C6C7];
+  const starColors = [0x8B5CF6, 0xFF4FA3, 0x45E8C4, 0xC7C9E8];
   const starGroups = [];
 
   function buildStarLayer(count, spread, size, colorHex) {
@@ -43,27 +40,20 @@ function initGalaxy() {
     }
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     const material = new THREE.PointsMaterial({
-      color: colorHex,
-      size,
-      transparent: true,
-      opacity: 0.75,
-      sizeAttenuation: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
+      color: colorHex, size, transparent: true, opacity: 0.75,
+      sizeAttenuation: true, blending: THREE.AdditiveBlending, depthWrite: false
     });
     const points = new THREE.Points(geometry, material);
     scene.add(points);
     return points;
   }
 
-  // Fewer particles on smaller / low-power screens for performance
   const isSmall = window.innerWidth < 768;
   starGroups.push(buildStarLayer(isSmall ? 500 : 1200, 400, 0.9, starColors[0]));
   starGroups.push(buildStarLayer(isSmall ? 400 : 900, 300, 0.7, starColors[1]));
   starGroups.push(buildStarLayer(isSmall ? 300 : 700, 220, 1.1, starColors[2]));
   starGroups.push(buildStarLayer(isSmall ? 600 : 1500, 500, 0.5, starColors[3]));
 
-  // --- Nebula glow (soft sprite, procedurally drawn — no external image) ---
   function makeNebulaTexture(colorA, colorB) {
     const size = 256;
     const c = document.createElement('canvas');
@@ -78,8 +68,8 @@ function initGalaxy() {
     return new THREE.CanvasTexture(c);
   }
 
-  const nebulaTex1 = makeNebulaTexture('rgba(0,240,255,0.25)', 'rgba(0,240,255,0.05)');
-  const nebulaTex2 = makeNebulaTexture('rgba(196,64,245,0.22)', 'rgba(196,64,245,0.04)');
+  const nebulaTex1 = makeNebulaTexture('rgba(139,92,246,0.25)', 'rgba(139,92,246,0.05)');
+  const nebulaTex2 = makeNebulaTexture('rgba(255,79,163,0.22)', 'rgba(255,79,163,0.04)');
 
   function addNebula(texture, x, y, z, scale) {
     const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
@@ -92,7 +82,6 @@ function initGalaxy() {
   addNebula(nebulaTex1, -60, 20, -150, 220);
   addNebula(nebulaTex2, 70, -30, -200, 260);
 
-  // --- Shooting stars ---
   const shootingStars = [];
   function spawnShootingStar() {
     const geometry = new THREE.BufferGeometry();
@@ -105,10 +94,9 @@ function initGalaxy() {
     scene.add(line);
     shootingStars.push({ mesh: line, life: 0, maxLife: 60 + Math.random() * 40 });
   }
-
   let shootingTimer = 0;
 
-  // --- Mouse parallax ---
+  // Mouse parallax (subtle camera move)
   let targetRotX = 0, targetRotY = 0;
   window.addEventListener('mousemove', (e) => {
     targetRotY = (e.clientX / window.innerWidth - 0.5) * 0.15;
@@ -133,96 +121,111 @@ function initGalaxy() {
       group.rotation.y += 0.00025 * (i % 2 === 0 ? 1 : -1) * (reduceMotion ? 0.2 : 1);
       group.rotation.x += 0.00008;
     });
-
     scene.rotation.y += (targetRotY - scene.rotation.y) * 0.03;
     scene.rotation.x += (targetRotX - scene.rotation.x) * 0.03;
 
     if (!reduceMotion) {
       shootingTimer++;
-      if (shootingTimer > 180 && Math.random() > 0.985) {
-        spawnShootingStar();
-        shootingTimer = 0;
-      }
+      if (shootingTimer > 180 && Math.random() > 0.985) { spawnShootingStar(); shootingTimer = 0; }
       for (let i = shootingStars.length - 1; i >= 0; i--) {
         const s = shootingStars[i];
         s.life++;
         s.mesh.position.x += 2.2;
         s.mesh.position.y -= 0.9;
         s.mesh.material.opacity = 0.9 * (1 - s.life / s.maxLife);
-        if (s.life >= s.maxLife) {
-          scene.remove(s.mesh);
-          shootingStars.splice(i, 1);
-        }
+        if (s.life >= s.maxLife) { scene.remove(s.mesh); shootingStars.splice(i, 1); }
       }
     }
-
     renderer.render(scene, camera);
   }
   animate();
 }
 
 /* =========================================================
-   2. WATER-RIPPLE CANVAS (hero interaction layer)
+   2. CURSOR PARTICLE TRAIL (canvas)
    ========================================================= */
-function initRipple() {
-  const canvas = document.getElementById('ripple');
-  if (!canvas || reduceMotion) return;
+function initCursorTrail() {
+  const canvas = document.getElementById('trail');
+  if (!canvas || reduceMotion || !hasHover) { if (canvas) canvas.style.display = 'none'; return; }
   const ctx = canvas.getContext('2d');
-  let ripples = [];
+  let particles = [];
+  const palette = ['rgba(139,92,246,0.7)', 'rgba(255,79,163,0.7)', 'rgba(69,232,196,0.7)'];
 
   function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
   resize();
   window.addEventListener('resize', resize);
 
-  function addRipple(x, y) {
-    ripples.push({ x, y, r: 0, alpha: 0.35 });
-    if (ripples.length > 12) ripples.shift();
-  }
-
-  let lastMove = 0;
+  let lastSpawn = 0;
   window.addEventListener('mousemove', (e) => {
     const now = Date.now();
-    if (now - lastMove < 120) return;
-    lastMove = now;
-    addRipple(e.clientX, e.clientY);
+    if (now - lastSpawn < 25) return;
+    lastSpawn = now;
+    particles.push({
+      x: e.clientX, y: e.clientY, r: Math.random() * 2 + 1.5,
+      vx: (Math.random() - 0.5) * 0.6, vy: (Math.random() - 0.5) * 0.6,
+      life: 1, color: palette[Math.floor(Math.random() * palette.length)]
+    });
+    if (particles.length > 60) particles.shift();
   });
-  window.addEventListener('click', (e) => addRipple(e.clientX, e.clientY));
 
   function tick() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ripples.forEach(r => {
-      r.r += 2.2;
-      r.alpha *= 0.965;
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy; p.life -= 0.02;
       ctx.beginPath();
-      ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(0,240,255,${r.alpha})`;
-      ctx.lineWidth = 1.4;
-      ctx.stroke();
+      ctx.arc(p.x, p.y, p.r * Math.max(p.life, 0), 0, Math.PI * 2);
+      ctx.fillStyle = p.color.replace('0.7', (0.7 * Math.max(p.life, 0)).toFixed(2));
+      ctx.fill();
     });
-    ripples = ripples.filter(r => r.alpha > 0.01);
+    particles = particles.filter(p => p.life > 0);
     requestAnimationFrame(tick);
   }
   tick();
 }
 
 /* =========================================================
-   3. LENIS SMOOTH SCROLL + GSAP SCROLLTRIGGER SYNC
+   3. SMOOTH SCROLL — SINGLE DRIVER (this fixes the lag bug)
+   Previously two loops (a manual rAF + gsap.ticker) were both
+   calling lenis.raf() at different time scales, causing stutter.
+   Now gsap.ticker is the ONLY driver.
    ========================================================= */
 function initSmoothScroll() {
   if (reduceMotion || typeof Lenis === 'undefined') return null;
-  const lenis = new Lenis({ duration: 1.1, smoothWheel: true });
 
-  function raf(time) {
-    lenis.raf(time);
-    requestAnimationFrame(raf);
-  }
-  requestAnimationFrame(raf);
+  const lenis = new Lenis({
+    duration: 0.8,           // snappier than before (was 1.1)
+    easing: (t) => 1 - Math.pow(1 - t, 3), // easeOutCubic — direct, not floaty
+    smoothWheel: true,
+    wheelMultiplier: 1,
+    touchMultiplier: 1.5
+  });
 
-  if (typeof ScrollTrigger !== 'undefined') {
-    lenis.on('scroll', ScrollTrigger.update);
+  if (typeof gsap !== 'undefined') {
     gsap.ticker.add((time) => { lenis.raf(time * 1000); });
     gsap.ticker.lagSmoothing(0);
+    if (typeof ScrollTrigger !== 'undefined') {
+      lenis.on('scroll', ScrollTrigger.update);
+    }
+  } else {
+    // Fallback: single manual driver only if GSAP failed to load
+    function raf(time) { lenis.raf(time); requestAnimationFrame(raf); }
+    requestAnimationFrame(raf);
   }
+
+  // Scroll-velocity ambient motion blur
+  let blurAmount = 0;
+  lenis.on('scroll', (e) => {
+    const v = Math.min(Math.abs(e.velocity || 0), 3);
+    blurAmount = Math.max(blurAmount, v * 1.8);
+  });
+  function decayBlur() {
+    blurAmount *= 0.85;
+    if (blurAmount < 0.05) blurAmount = 0;
+    document.body.style.filter = blurAmount > 0.05 ? `blur(${blurAmount.toFixed(2)}px)` : 'none';
+    requestAnimationFrame(decayBlur);
+  }
+  decayBlur();
+
   return lenis;
 }
 
@@ -249,7 +252,7 @@ function initScrollAnimations() {
     scale: { from: { opacity: 0, scale: 0.85, y: 20 }, to: { opacity: 1, scale: 1, y: 0 } }
   };
 
-  document.querySelectorAll('[data-gsap]').forEach((el, i) => {
+  document.querySelectorAll('[data-gsap]').forEach((el) => {
     const type = el.getAttribute('data-gsap') || 'fade';
     const v = variants[type] || variants.fade;
     gsap.fromTo(el, v.from, {
@@ -257,38 +260,51 @@ function initScrollAnimations() {
       duration: 0.9,
       ease: 'power3.out',
       delay: parseFloat(getComputedStyle(el).getPropertyValue('--delay')) || 0,
-      scrollTrigger: {
-        trigger: el,
-        start: 'top 88%',
-        toggleActions: 'play none none reverse'
-      }
+      scrollTrigger: { trigger: el, start: 'top 88%', toggleActions: 'play none none reverse' }
     });
   });
 }
 
 /* =========================================================
-   5. KINETIC TYPOGRAPHY — hero name, letter by letter
+   5. KINETIC TYPOGRAPHY — letter-by-letter for hero + all section titles
    ========================================================= */
-function initKineticHero() {
-  const heroName = document.getElementById('heroName');
-  if (!heroName) return;
-  const text = heroName.textContent.trim();
-  heroName.textContent = '';
+function splitIntoLetters(el, className) {
+  const text = el.textContent.trim();
+  el.textContent = '';
   text.split('').forEach(ch => {
     const span = document.createElement('span');
-    span.className = 'letter';
-    span.textContent = ch;
-    heroName.appendChild(span);
+    span.className = className;
+    span.textContent = ch === ' ' ? '\u00A0' : ch;
+    el.appendChild(span);
   });
+}
+
+function initKineticTypography() {
+  const heroName = document.getElementById('heroName');
+  if (heroName) splitIntoLetters(heroName, 'letter');
+
+  document.querySelectorAll('.kinetic-heading').forEach(h => splitIntoLetters(h, 'letter'));
 
   if (reduceMotion || typeof gsap === 'undefined') {
-    heroName.querySelectorAll('.letter').forEach(l => { l.style.opacity = 1; l.style.transform = 'none'; });
+    document.querySelectorAll('.letter').forEach(l => { l.style.opacity = 1; l.style.transform = 'none'; });
     return;
   }
-  gsap.to(heroName.querySelectorAll('.letter'), {
-    opacity: 1, y: 0, duration: 0.7, stagger: 0.06, ease: 'back.out(1.6)', delay: 0.2
-  });
+
+  // Hero letters animate immediately on load
+  if (heroName) {
+    gsap.to(heroName.querySelectorAll('.letter'), {
+      opacity: 1, y: 0, duration: 0.7, stagger: 0.06, ease: 'back.out(1.6)', delay: 0.2
+    });
+  }
   gsap.to('[data-gsap="fade"]', { opacity: 1, y: 0, duration: 0.8, stagger: 0.12, delay: 0.5, ease: 'power2.out' });
+
+  // Section headings animate on scroll into view
+  document.querySelectorAll('.section-head .kinetic-heading, .footer-card .kinetic-heading').forEach(h => {
+    gsap.to(h.querySelectorAll('.letter'), {
+      opacity: 1, y: 0, duration: 0.5, stagger: 0.025, ease: 'power2.out',
+      scrollTrigger: { trigger: h, start: 'top 90%', toggleActions: 'play none none reverse' }
+    });
+  });
 }
 
 /* =========================================================
@@ -423,11 +439,10 @@ function initMagneticButtons() {
    ========================================================= */
 function initAmbientSound() {
   const toggle = document.getElementById('soundToggle');
+  const icon = document.getElementById('soundIcon');
   if (!toggle) return;
 
-  let audioCtx = null;
-  let nodes = null;
-  let playing = false;
+  let audioCtx = null, nodes = null, playing = false;
 
   function buildDrone() {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -435,38 +450,39 @@ function initAmbientSound() {
     const osc2 = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     const filter = audioCtx.createBiquadFilter();
-
     osc1.type = 'sine'; osc1.frequency.value = 60;
     osc2.type = 'sine'; osc2.frequency.value = 90.3;
     filter.type = 'lowpass'; filter.frequency.value = 300;
     gain.gain.value = 0;
-
     osc1.connect(filter); osc2.connect(filter);
     filter.connect(gain); gain.connect(audioCtx.destination);
     osc1.start(); osc2.start();
-
     return { osc1, osc2, gain, filter };
   }
 
   toggle.addEventListener('click', async () => {
     if (!audioCtx) nodes = buildDrone();
     if (audioCtx.state === 'suspended') await audioCtx.resume();
-
     playing = !playing;
     toggle.setAttribute('aria-pressed', playing ? 'true' : 'false');
-    toggle.textContent = playing ? '🔊' : '🔇';
+    if (icon && typeof lucide !== 'undefined') {
+      icon.setAttribute('data-lucide', playing ? 'volume-2' : 'volume-x');
+      lucide.createIcons();
+    }
     nodes.gain.gain.linearRampToValueAtTime(playing ? 0.035 : 0, audioCtx.currentTime + 0.6);
   });
 }
 
 /* =========================================================
-   INIT — run after DOM is ready
+   INIT
    ========================================================= */
 document.addEventListener('DOMContentLoaded', () => {
-  initKineticHero();
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  initKineticTypography();
   initCycleText();
   initGalaxy();
-  initRipple();
+  initCursorTrail();
   initSmoothScroll();
   initScrollAnimations();
   initExpandableCards();
