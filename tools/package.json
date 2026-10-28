@@ -1,0 +1,4 @@
+{ "name": "site-tools", "private": true,
+  "dependencies": { "gsap": "3.12.5", "lenis": "1.1.13", "lucide": "0.454.0", "three": "0.128.0",
+    "@fontsource/sora": "*", "@fontsource/inter": "*", "@fontsource/space-grotesk": "*", "@fontsource/jetbrains-mono": "*",
+    "@fontsource/amiri": "*", "@fontsource/noto-sans-bengali": "*", "terser": "*", "clean-css-cli": "*" } }
